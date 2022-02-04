@@ -6,7 +6,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::future_to_promise;
 
 /// A context bound to a `fetch` event.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Context {
     inner: JsContext,
 }
