@@ -1,8 +1,10 @@
+use std::convert::{TryFrom, TryInto};
+
 use serde::Serialize;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use worker_sys::cache::Cache as EdgeCache;
-use worker_sys::Response as EdgeResponse;
+use worker_sys::{Response as EdgeResponse, Request as EdgeRequest};
 use worker_sys::WorkerGlobalScope;
 
 use crate::request::Request;
@@ -68,14 +70,10 @@ impl Cache {
     /// - the request passed is a method other than GET.
     /// - the response passed has a status of 206 Partial Content.
     /// - the response passed contains the header `Vary: *` (required by the Cache API specification).
-    pub async fn put<'a, K: Into<CacheKey<'a>>>(&self, key: K, response: Response) -> Result<()> {
-        let promise = match key.into() {
+    pub async fn put<'a, K: TryInto<CacheKey>>(&self, key: K, response: Response) -> Result<()> where crate::Error: From<K::Error> {
+        let promise = match key.try_into()? {
             CacheKey::Url(url) => self.inner.put_url(url, response.into()),
-            CacheKey::Request(request) => {
-                // TODO: use from?
-                let ffi_request = request.inner().clone()?;
-                self.inner.put_request(ffi_request, response.into())
-            }
+            CacheKey::Request(request) => self.inner.put_request(request, response.into()),
         };
         let _ = JsFuture::from(promise).await?;
         Ok(())
@@ -93,19 +91,15 @@ impl Cache {
     ///   - Results in a `304` response if a matching response is found with a `Last-Modified` header with a value after the time specified in `If-Modified-Since`.
     /// - If-None-Match
     ///   - Results in a `304` response if a matching response is found with an `ETag` header with a value that matches a value in `If-None-Match.`
-    pub async fn get<'a, K: Into<CacheKey<'a>>>(
+    pub async fn get<'a, K: TryInto<CacheKey>>(
         &self,
         key: K,
         ignore_method: bool,
-    ) -> Result<Option<Response>> {
+    ) -> Result<Option<Response>> where crate::Error: From<K::Error> {
         let options = JsValue::from_serde(&MatchOptions { ignore_method })?;
-        let promise = match key.into() {
+        let promise = match key.try_into()? {
             CacheKey::Url(url) => self.inner.match_url(url, options),
-            CacheKey::Request(request) => {
-                // TODO: the same thing as above, why can't i use Into::into()?
-                let ffi_request = request.inner().clone()?;
-                self.inner.match_request(ffi_request, options)
-            }
+            CacheKey::Request(request) => self.inner.match_request(request, options),
         };
 
         // `match` returns either a response or undefined
@@ -119,20 +113,16 @@ impl Cache {
         }
     }
 
-    pub async fn delete<'a, K: Into<CacheKey<'a>>>(
+    pub async fn delete<'a, K: TryInto<CacheKey>>(
         &self,
         key: K,
         ignore_method: bool,
-    ) -> Result<CacheDeletionOutcome> {
+    ) -> Result<CacheDeletionOutcome> where crate::Error: From<K::Error> {
         let options = JsValue::from_serde(&MatchOptions { ignore_method })?;
 
-        let promise = match key.into() {
+        let promise = match key.try_into()? {
             CacheKey::Url(url) => self.inner.delete_url(url, options),
-            CacheKey::Request(request) => {
-                // TODO: the same thing as above, why can't i use Into::into()?
-                let ffi_request = request.inner().clone()?;
-                self.inner.delete_request(ffi_request, options)
-            }
+            CacheKey::Request(request) => self.inner.delete_request(request, options),
         };
         let result = JsFuture::from(promise).await?;
 
@@ -154,21 +144,40 @@ struct MatchOptions {
     ignore_method: bool,
 }
 
-/// The `String` or `Request` object used as the lookup key. `String`s are interpreted as the URL for a new `Request` object.
-pub enum CacheKey<'a> {
+pub enum CacheKey {
     Url(String),
-    Request(&'a Request),
+    Request(EdgeRequest),
 }
 
-impl<S: Into<String>> From<S> for CacheKey<'_> {
-    fn from(url: S) -> Self {
+impl From<&str> for CacheKey {
+    fn from(url: &str) -> Self {
         Self::Url(url.into())
     }
 }
 
-impl<'a> From<&'a Request> for CacheKey<'a> {
-    fn from(request: &'a Request) -> Self {
+impl From<String> for CacheKey {
+    fn from(url: String) -> Self {
+        Self::Url(url)
+    }
+}
+
+impl From<url::Url> for CacheKey {
+    fn from(url: url::Url) -> Self {
+        Self::Url(url.to_string())
+    }
+}
+
+impl From<EdgeRequest> for CacheKey {
+    fn from(request: EdgeRequest) -> Self {
         Self::Request(request)
+    }
+}
+
+impl TryFrom<&Request> for CacheKey {
+    type Error = crate::Error;
+
+    fn try_from(value: &Request) -> Result<Self> {
+        Ok(Self::Request(value.inner().clone()?))
     }
 }
 

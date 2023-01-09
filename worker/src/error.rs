@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use wasm_bindgen::{JsCast, JsValue};
 
 /// All possible Error variants that might be encountered while working with a Worker.
@@ -26,6 +28,12 @@ impl From<worker_kv::KvError> for Error {
 impl From<url::ParseError> for Error {
     fn from(e: url::ParseError) -> Self {
         Self::RustError(e.to_string())
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(e: Infallible) -> Self {
+        match e {}
     }
 }
 
