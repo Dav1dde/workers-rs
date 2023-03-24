@@ -134,6 +134,7 @@ fn bundle(esbuild_path: &Path) -> Result<()> {
     let mut command = Command::new(esbuild_path);
     command.args([
         "--external:./index.wasm",
+        "--external:__STATIC_CONTENT_MANIFEST",
         "--format=esm",
         "--bundle",
         "./shim.js",

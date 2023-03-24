@@ -450,3 +450,9 @@ impl From<web_sys::Response> for Response {
         }
     }
 }
+
+impl From<Response> for (u16, Headers, ResponseBody) {
+    fn from(value: Response) -> Self {
+        (value.status_code, value.headers, value.body)
+    }
+}

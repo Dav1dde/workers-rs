@@ -49,9 +49,9 @@ impl Default for Cache {
 
 impl Cache {
     /// Opens a [`Cache`] by name. To access the default global cache, use [`Cache::default()`](`Default::default`).
-    pub async fn open(name: String) -> Self {
+    pub async fn open(name: &str) -> Self {
         let global: web_sys::WorkerGlobalScope = js_sys::global().unchecked_into();
-        let cache = global.caches().unwrap().open(&name);
+        let cache = global.caches().unwrap().open(name);
 
         // unwrap is safe because this promise never rejects
         // https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage/open
@@ -79,6 +79,7 @@ impl Cache {
             CacheKey::Request(request) => self
                 .inner
                 .put_with_request(&request.try_into()?, &response.into()),
+            CacheKey::RawRequest(request) => self.inner.put_with_request(request, &response.into()),
         };
         let _ = JsFuture::from(promise).await?;
         Ok(())
@@ -113,6 +114,9 @@ impl Cache {
             CacheKey::Request(request) => self
                 .inner
                 .match_with_request_and_options(&request.try_into()?, &options),
+            CacheKey::RawRequest(request) => {
+                self.inner.match_with_request_and_options(request, &options)
+            }
         };
 
         // `match` returns either a response or undefined
@@ -146,6 +150,9 @@ impl Cache {
             CacheKey::Request(request) => self
                 .inner
                 .delete_with_request_and_options(&request.try_into()?, &options),
+            CacheKey::RawRequest(request) => self
+                .inner
+                .delete_with_request_and_options(request, &options),
         };
         let result = JsFuture::from(promise).await?;
 
@@ -163,6 +170,7 @@ impl Cache {
 pub enum CacheKey<'a> {
     Url(String),
     Request(&'a Request),
+    RawRequest(&'a web_sys::Request),
 }
 
 impl From<&str> for CacheKey<'_> {
@@ -186,6 +194,12 @@ impl From<&String> for CacheKey<'_> {
 impl<'a> From<&'a Request> for CacheKey<'a> {
     fn from(request: &'a Request) -> Self {
         Self::Request(request)
+    }
+}
+
+impl<'a> From<&'a web_sys::Request> for CacheKey<'a> {
+    fn from(request: &'a web_sys::Request) -> Self {
+        Self::RawRequest(request)
     }
 }
 
