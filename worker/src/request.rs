@@ -5,8 +5,7 @@ use crate::{
 };
 
 use serde::de::DeserializeOwned;
-use std::borrow::Cow;
-use url::{form_urlencoded::Parse, Url};
+use url::Url;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use worker_sys::ext::RequestExt;
@@ -63,10 +62,11 @@ impl TryFrom<&Request> for web_sys::Request {
 impl Request {
     /// Construct a new `Request` with an HTTP Method.
     pub fn new(uri: &str, method: Method) -> Result<Self> {
-        web_sys::Request::new_with_str_and_init(
-            uri,
-            web_sys::RequestInit::new().method(method.as_ref()),
-        )
+        web_sys::Request::new_with_str_and_init(uri, &{
+            let init = web_sys::RequestInit::new();
+            init.set_method(method.as_ref());
+            init
+        })
         .map(|req| {
             let mut req: Request = req.into();
             req.immutable = false;
@@ -253,53 +253,6 @@ impl Request {
     pub fn inner(&self) -> &web_sys::Request {
         &self.edge_request
     }
-}
-
-/// Used to add additional helper functions to url::Url
-pub trait UrlExt {
-    /// Given a query parameter, returns the value of the first occurrence of that parameter if it
-    /// exists
-    fn param<'a>(&'a self, key: &'a str) -> Option<Cow<'a, str>> {
-        self.param_iter(key).next()
-    }
-    /// Given a query parameter, returns an Iterator of values for that parameter in the url's
-    /// query string
-    fn param_iter<'a>(&'a self, key: &'a str) -> ParamIter<'a>;
-}
-
-impl UrlExt for Url {
-    fn param_iter<'a>(&'a self, key: &'a str) -> ParamIter<'a> {
-        ParamIter {
-            inner: self.query_pairs(),
-            key,
-        }
-    }
-}
-
-pub struct ParamIter<'a> {
-    inner: Parse<'a>,
-    key: &'a str,
-}
-
-impl<'a> Iterator for ParamIter<'a> {
-    type Item = Cow<'a, str>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let key = self.key;
-        Some(self.inner.find(|(k, _)| k == key)?.1)
-    }
-}
-
-#[test]
-fn url_param_works() {
-    let url = Url::parse("https://example.com/foo.html?a=foo&b=bar&a=baz").unwrap();
-    assert_eq!(url.param("a").as_deref(), Some("foo"));
-    assert_eq!(url.param("b").as_deref(), Some("bar"));
-    assert_eq!(url.param("c").as_deref(), None);
-    let mut a_values = url.param_iter("a");
-    assert_eq!(a_values.next().as_deref(), Some("foo"));
-    assert_eq!(a_values.next().as_deref(), Some("baz"));
-    assert_eq!(a_values.next(), None);
 }
 
 #[test]

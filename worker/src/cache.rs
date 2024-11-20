@@ -104,8 +104,8 @@ impl Cache {
         key: K,
         ignore_method: bool,
     ) -> Result<Option<Response>> {
-        let mut options = web_sys::CacheQueryOptions::new();
-        options.ignore_method(ignore_method);
+        let options = web_sys::CacheQueryOptions::new();
+        options.set_ignore_method(ignore_method);
 
         let promise = match key.into() {
             CacheKey::Url(url) => self
@@ -140,8 +140,8 @@ impl Cache {
         key: K,
         ignore_method: bool,
     ) -> Result<CacheDeletionOutcome> {
-        let mut options = web_sys::CacheQueryOptions::new();
-        options.ignore_method(ignore_method);
+        let options = web_sys::CacheQueryOptions::new();
+        options.set_ignore_method(ignore_method);
 
         let promise = match key.into() {
             CacheKey::Url(url) => self

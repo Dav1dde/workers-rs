@@ -33,7 +33,7 @@ worker-macros = { path = "../worker-macros", version = "0.0.8" }
 worker-sys = { path = "../worker-sys", version = "0.0.8" }
 
 [dependencies.web-sys]
-version = "0.3.57"
+version = "0.3.72"
 features = [
     "File",
     "WorkerGlobalScope"

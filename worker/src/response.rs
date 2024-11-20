@@ -342,8 +342,8 @@ pub struct ResponseInit {
 impl From<ResponseInit> for web_sys::ResponseInit {
     fn from(init: ResponseInit) -> Self {
         let mut edge_init = web_sys::ResponseInit::new();
-        edge_init.status(init.status);
-        edge_init.headers(&init.headers.0);
+        edge_init.set_status(init.status);
+        edge_init.set_headers(&init.headers.0);
         if let Some(websocket) = &init.websocket {
             edge_init.websocket(websocket.as_ref());
         }
